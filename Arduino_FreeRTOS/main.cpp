@@ -9,6 +9,7 @@
 
 #include <util/delay.h>
 #include <avr/interrupt.h>
+// #include <cstring>
 
 #define Idle_Priority   (tskIDLE_PRIORITY)
 
@@ -62,8 +63,10 @@ int count = 0;
 
 // Variables globales
 #define UID_SIZE 16
-unsigned char current_uid[UID_SIZE] = {0}; // Initialisé à zéro
+unsigned char current_uid[UID_SIZE] = {0};
+; // Initialisé à zéro
 int card_detected = 0;
+int send_card_uid = 1;
 
 volatile uint8_t twi_command = 0;
 volatile uint8_t twi_data_index = 0;
@@ -106,7 +109,7 @@ unsigned char softserial_read()
     unsigned char data = 0;
     while (PIND & (1 << SOFTSERIAL_RX_PIN))
         ;
-    _delay_us(BIT_PERIOD_US / 2);
+    // _delay_us(BIT_PERIOD_US / 2);
 
     for (int i = 0; i < 8; i++)
     {
@@ -131,6 +134,41 @@ void twi_init_slave(uint8_t address)
     TWCR = (1 << TWEN) | (1 << TWIE) | (1 << TWEA);
 }
 
+void debug_print(const char *s)
+{
+    while (*s)
+    {
+        uart_tx(*s++);
+    }
+}
+
+// Convertit un octet (0-255) en sa représentation hexadécimale (2 caractères) et l'envoie.
+void uart_print_hex_byte(uint8_t b)
+{
+    char hex_digits[] = "0123456789ABCDEF";
+
+    // Imprimer le quartet de poids fort (MSB)
+    uart_tx(hex_digits[(b >> 4) & 0x0F]);
+
+    // Imprimer le quartet de poids faible (LSB)
+    uart_tx(hex_digits[b & 0x0F]);
+}
+
+// Imprime un tableau d'octets en hexadécimal, avec un préfixe et un retour à la ligne.
+void uart_print_hex_buffer(const unsigned char *buffer, int len)
+{
+    debug_print("Rx_SS: "); // Préfixe pour identifier la source
+    for (int i = 0; i < len; i++)
+    {
+        uart_print_hex_byte(buffer[i]);
+        uart_tx(' '); // Espace entre les bytes pour la lisibilité
+    }
+    debug_print("(len=");
+    // Pour afficher la longueur, une fonction itoa simple serait nécessaire.
+    // Nous allons juste imprimer le buffer pour l'instant.
+    uart_tx('\n');
+}
+
 ISR(TWI_vect)
 {
     uint8_t status = TWSR & 0xF8; // Masquer les bits de prescaler
@@ -142,21 +180,20 @@ ISR(TWI_vect)
     case 0x60:           // SLA+W reçu, ACK envoyé
     case 0x68:           // Arbitration perdu mais SLA+W reçu, ACK envoyé
         twi_command = 0; // Réinitialiser la commande
-        TWCR = (1 << TWINT) | (1 << TWEN) | (1 << TWIE);
+        TWCR = (1 << TWINT) | (1 << TWEN) | (1 << TWIE) | (1 << TWEA);
         // TWCR configuré par défaut à la fin du switch (TWEN | TWIE | TWEA)
         break;
 
-    case 0x80: // Byte de donnée reçu, ACK envoyé
-        // Réception de la commande (premier et seul octet attendu)
+    case 0x80:
         twi_command = TWDR;
-        // NACK le prochain octet (si le Maître essaie d'en envoyer un autre)
+        if ((twi_command == 0x03) && (card_detected == 1)) send_card_uid = 1;
         TWCR = (1 << TWINT) | (1 << TWEN) | (1 << TWIE);
         break;
 
     // --- MASTER READ (TRANSMISSION DE L'UID) ---
     case 0xA8: // SLA+R reçu, ACK envoyé
     case 0xB0: // Arbitration perdu mais SLA+R reçu, ACK envoyé
-        if (twi_command == 0x03)
+        if (send_card_uid == 1) 
         {
             // La commande 0x03 a été reçue. Préparer l'envoi de l'UID.
             twi_data_index = 0;
@@ -170,7 +207,7 @@ ISR(TWI_vect)
         else
         {
             // Commande non reconnue ou aucune commande. Envoyer une valeur par défaut.
-            TWDR = 0xFF;
+            TWDR = 0x1A;
             TWCR = (1 << TWINT) | (1 << TWEN) | (1 << TWIE); // NACK (fin de transmission)
         }
         break;
@@ -236,8 +273,10 @@ static void WaitingTask( void *pvParameters ){
                 buffer[count++] = softserial_read();
             if (count > 0)
             {
+                uart_print_hex_buffer(buffer, count);
                 card_detected = 1;
                 int uid_len = (count < UID_SIZE) ? count : UID_SIZE;
+                // memcpy(current_uid, buffer, uid_len);
                 // Copie manuelle de l'UID (équivalent à memcpy(current_uid, buffer, uid_len))
                 for (int i = 0; i < uid_len; i++)
                     current_uid[i] = buffer[i];
