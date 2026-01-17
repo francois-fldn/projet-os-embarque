@@ -18,34 +18,27 @@
 
 static void RFIDReadTask(void *pvParameters);
 static void ActivateActuatorTask(void *pvParameters);
-// static void CheckPassageTask(void *pvParameters);
 
 void receiveEvent(int howMany);
 void requestEvent();
 
-
-
 // Buffer pour l'UART
 #define UID_SIZE 16
-unsigned char buffer[UID_SIZE];
-int count = 0;
 
+// Adresse I2C de l'Arduino, à modifier pour simuler différentes salles
+// 0x42 -> entre, 0x43 -> entre pas, 0x44 -> entre pas
+#define SLAVE_ADRESS 0x43 
+
+// Les actionneurs
 const uint8_t blueLED       = _BV(PD5);
 const uint8_t buzzer        = _BV(PD6);
 
-// Config I2C
-#define SLAVE_ADRESS 0x43 // Adresse I2C de l'Arduino
-
 // Variables globales
-unsigned char current_uid[UID_SIZE] = {0};
-
-volatile uint8_t card_detected  = 0;
-volatile uint8_t State_IR_A     = 0;
-volatile uint8_t nb_passage     = 0;
-
+unsigned char current_uid[UID_SIZE]         = {0};
 volatile uint8_t activate_actuator_ok       = 0;
 volatile uint8_t activate_actuator_not_ok   = 0;
-volatile long current_distance_cm           = 0;
+
+
 
 class RfidTask
 {
@@ -164,8 +157,8 @@ int main(void)
     sei();
 
     // Create tasks
-    xTaskCreate(RFIDReadTask, "RFIDReadTask", 128, NULL, tskIDLE_PRIORITY + 1, NULL);
-    xTaskCreate(ActivateActuatorTask, "ActivateActuatorTask", 128, NULL, tskIDLE_PRIORITY + 1, NULL);
+    xTaskCreate(RFIDReadTask, "RFIDReadTask", 128, NULL, tskIDLE_PRIORITY + 3, NULL);
+    xTaskCreate(ActivateActuatorTask, "ActivateActuatorTask", 128, NULL, tskIDLE_PRIORITY + 2, NULL);
     // xTaskCreate(CheckPassageTask, "CheckPassageTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL);
 
     vTaskStartScheduler();
@@ -201,6 +194,7 @@ static void RFIDReadTask(void *pvParameters)
 
             for (int i=0; i<len; i++) current_uid[i] = uid[i];
         }
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
@@ -222,5 +216,6 @@ static void ActivateActuatorTask(void *pvParameters)
             PORTD &= ~(buzzer);
             activate_actuator_not_ok = 0;
         }
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
