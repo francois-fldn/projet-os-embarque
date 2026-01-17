@@ -1,6 +1,46 @@
 # projet-os-embarque
 
 - je me rappelle plus comment on setup le projet cote arduino
+## demarrer le projet sur arduino
+
+executer la commande pour decompresser le core arduino et freertos
+```bash
+./init.sh
+```
+
+compiler le code source arduino avr-gcc et upload SANS brancher le capteur sur le port UART (sinon ça marche pas)
+```bash
+make
+make upload
+```
+
+## démarrer la passerelle
+### installer les dépendances
+- mosquitto
+- sqlite3
+- i2c
+
+### lancer le maitre i2c
+demarrer un environnement virtuel python (optionnel)
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+installer les requirements
+```bash
+pip -r requirements.txt
+```
+
+enfin pour démarrer le maitre i2c
+```bash
+python3 main.py <adresses esclaves i2c> <ip broker mqtt>
+```
+par exemple, si je dois me connecter aux esclaves 66 67 et 68 et au broker mqtt localhost
+
+```bash
+python3 main.py 66 67 68 localhost
+```
 
 ## demarrer et tester le broker mqtt
 
