@@ -30,11 +30,11 @@ description="""
             """
 )
 
-parser.add_argument('room_id', 
-                  type = int, 
-                  help = 'Liste des id de salle à contrôler',
-                  nargs='+'
-)
+# parser.add_argument('room_id', 
+#                  type = int, 
+#                  help = 'Liste des id de salle à contrôler',
+#                  nargs='+'
+#)
 
 parser.add_argument('ip_mqtt', 
                   type = str, 
@@ -74,6 +74,17 @@ def get_card_uid(i2c_add: int):
 # =====================================
 # ==    FONCTIONS DE FETCH BDD       ==
 # =====================================
+
+def get_room_list():
+  global connection
+  c = connection.cursor()
+  query = "SELECT room_id FROM room"
+  c.execute(query, ())
+  resultat = c.fetchall()
+  if resultat:
+    return [i[0] for i in resultat]
+  else:
+    return None
 
 def get_room_permissions(i2c_add: int):
   global connection
@@ -119,7 +130,13 @@ def send_mqtt(room_id: int, uid: str, decision: str):
 
 
 def main():
-  global rooms
+  rooms = get_room_list()
+
+  if rooms == None:
+    logger.error("Aucune salle dans la base de données.")
+    exit(1)
+
+  logger.info(f"Salles récupérées: {rooms}")
 
   permission_list = dict()
 
@@ -171,7 +188,7 @@ def main():
 if __name__ == "__main__":
 
   args = parser.parse_args()
-  rooms = args.room_id
+ # rooms = args.room_id
   MQTT_BROKER_HOST = args.ip_mqtt
 
   not_connected = True

@@ -27,7 +27,7 @@ void requestEvent();
 
 // Adresse I2C de l'Arduino, à modifier pour simuler différentes salles
 // 0x42 -> entre, 0x43 -> entre pas, 0x44 -> entre pas
-#define SLAVE_ADRESS 0x43
+#define SLAVE_ADRESS 0x42
 
 // Les actionneurs
 const uint8_t blueLED       = _BV(PD5);
